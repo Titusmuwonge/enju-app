@@ -2,30 +2,24 @@ import { useState } from 'react'
 import { supabase } from '../lib/supabase'
 
 export default function Login() {
-  const [phone, setPhone] = useState('')
-  const [otp, setOtp] = useState('')
-  const [stage, setStage] = useState<'phone' | 'otp'>('phone')
+  const [email, setEmail] = useState('')
+  const [sent, setSent] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
 
-  async function sendOtp() {
+  async function sendMagicLink() {
     setLoading(true)
     setError(null)
-    const { error } = await supabase.auth.signInWithOtp({ phone })
+    const { error } = await supabase.auth.signInWithOtp({
+      email,
+      options: { emailRedirectTo: window.location.origin },
+    })
     setLoading(false)
     if (error) {
       setError(error.message)
       return
     }
-    setStage('otp')
-  }
-
-  async function verifyOtp() {
-    setLoading(true)
-    setError(null)
-    const { error } = await supabase.auth.verifyOtp({ phone, token: otp, type: 'sms' })
-    setLoading(false)
-    if (error) setError(error.message)
+    setSent(true)
   }
 
   return (
@@ -41,42 +35,39 @@ export default function Login() {
           <span className="text-xl font-extrabold text-ink">Enju</span>
         </div>
 
-        {stage === 'phone' ? (
+        {!sent ? (
           <>
             <h1 className="mb-1 text-lg font-bold text-ink">Welcome back</h1>
-            <p className="mb-5 text-sm text-ink/60">Sign in with your phone number.</p>
+            <p className="mb-5 text-sm text-ink/60">
+              Enter your email, we'll send a sign-in link. No password.
+            </p>
             <input
-              type="tel"
-              value={phone}
-              onChange={(e) => setPhone(e.target.value)}
-              placeholder="+256 7XX XXX XXX"
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="you@example.com"
               className="mb-4 w-full rounded-xl border border-ink/15 px-4 py-3 text-sm outline-none focus:border-brand"
             />
             <button
-              onClick={sendOtp}
-              disabled={loading || !phone}
+              onClick={sendMagicLink}
+              disabled={loading || !email}
               className="w-full rounded-xl bg-brand px-4 py-3 text-sm font-bold text-white hover:bg-brand-deep disabled:opacity-50"
             >
-              {loading ? 'Sending…' : 'Send code'}
+              {loading ? 'Sending…' : 'Send sign-in link'}
             </button>
           </>
         ) : (
           <>
-            <h1 className="mb-1 text-lg font-bold text-ink">Enter the code</h1>
-            <p className="mb-5 text-sm text-ink/60">We sent a code to {phone}.</p>
-            <input
-              type="text"
-              value={otp}
-              onChange={(e) => setOtp(e.target.value)}
-              placeholder="123456"
-              className="mb-4 w-full rounded-xl border border-ink/15 px-4 py-3 text-center text-lg tracking-widest outline-none focus:border-brand"
-            />
+            <h1 className="mb-1 text-lg font-bold text-ink">Check your email</h1>
+            <p className="text-sm text-ink/60">
+              We sent a sign-in link to <span className="font-semibold text-ink">{email}</span>.
+              Open it on this device to continue.
+            </p>
             <button
-              onClick={verifyOtp}
-              disabled={loading || otp.length < 4}
-              className="w-full rounded-xl bg-brand px-4 py-3 text-sm font-bold text-white hover:bg-brand-deep disabled:opacity-50"
+              onClick={() => setSent(false)}
+              className="mt-4 text-xs font-semibold text-brand-deep hover:underline"
             >
-              {loading ? 'Verifying…' : 'Verify'}
+              Use a different email
             </button>
           </>
         )}

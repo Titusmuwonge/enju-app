@@ -10,7 +10,8 @@ export type PaymentStatus = 'pending' | 'confirmed'
 
 export interface Profile {
   id: string
-  phone: string
+  phone: string | null
+  email: string | null
   full_name: string | null
   role: Role
   created_at: string
