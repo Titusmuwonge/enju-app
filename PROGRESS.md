@@ -9,28 +9,28 @@ Read this file first, every session. It's the single source of truth for where t
 - Supabase creds are in `.env.local` (gitignored, not in this repo — if a fresh clone is missing them, pull from Supabase project settings or ask Titus)
 
 ## Done
-- Supabase project created, core schema applied (migrations `core_schema`, `email_auth_support`): `profiles` (phone optional, email unique), `fences`, `fence_managers`, `units`, `tenancies`, `payments`, `receipts` — all with RLS policies scoping landlord/manager/tenant access correctly
-- Email magic link login (`src/pages/Login.tsx`) via `supabase.auth.signInWithOtp({ email })` — zero cost, no SMS provider dependency
-- First-time profile setup (`src/pages/CompleteProfile.tsx`) — name + role picker, inserts the `profiles` row after first magic-link sign-in
-- Landlord dashboard (`src/pages/landlord/Dashboard.tsx`) — live tenant list from Supabase (tenancy → unit → fence → tenant join), "Mark paid" writes a real payment + auto-generated receipt. Responsive: dense table on desktop (`md:` breakpoint), stacked cards on mobile — same data, same component, confirmed by a rendered mockup at both widths
-- Landlord buildings screen (`src/pages/landlord/Fences.tsx`) — create a building (auto-generates a block ID code), add units with label + rent
-- `LandlordLayout` (`src/components/LandlordLayout.tsx`) — desktop sidebar nav, mobile bottom tab bar, same routes
-- Router shell with auth gate: no session → `/login`, session but no profile row → `/complete-profile`, otherwise → `/landlord`
+- Supabase schema (migrations `core_schema`, `email_auth_support`, `tenant_join_flow_rls`): `profiles`, `fences`, `fence_managers`, `units`, `tenancies`, `payments`, `receipts`, all RLS-scoped by role, including the policies needed for a tenant to self-join a building (read a fence by code, read vacant units, insert their own tenancy, flip their own unit to occupied)
+- Email magic link login + first-time profile setup (name + role)
+- Role-aware root redirect (`/`): landlord/manager → `/landlord`, tenant → `/tenant`
+- **Landlord side**: responsive dashboard (desktop table + sidebar, mobile cards + bottom tabs, same data), buildings screen to create fences/units with an auto-generated block ID code, three-state payment badge (Paid / Awaiting confirm / Not paid) with a real confirm action — landlord can either confirm a tenant's self-reported payment or mark one paid directly (cash-in-hand case)
+- **Tenant side** (Airbnb-style, mobile-only, no desktop variant by design): `/join-building` screen (enter a block ID, claims a vacant unit), Home screen with a single bold status hero card (rent due / payment sent awaiting confirmation / paid this month), "I've paid" writes a real pending payment Supabase row, bottom tab bar (Home / Calendar / Discover)
+- Calendar and Discover tabs are routed and real pages, but intentionally honest placeholders, not fake data — they say plainly what's coming
+- Design approach: followed the `frontend-design` skill — kept Enju's existing blue (already out in the field on campaign graphics) rather than defaulting to Airbnb's literal coral, borrowed Airbnb's UX grammar instead (one bold hero card per screen, card-based browsing, bottom tabs, quiet supporting content)
 
 ## Not done yet (in order)
-1. Tenant app: Home, Calendar, Discover tabs, Airbnb-style UI/UX and flow, fully mobile-optimized (confirmed direction, not started)
-2. Onboarding flow proper: country → block-ID code entry → join a building as tenant (currently only the landlord side can create fences/units; nothing lets a tenant attach to one yet)
-3. Manager role support in UI (schema supports it via `fence_managers`, no screens yet — managers would see the same dashboard scoped to assigned fences only)
+1. Tenant Calendar: real payment history view (data already being written, just needs a screen)
+2. Tenant Discover: cross-building vacancy marketplace (needs more than one live building first to mean anything)
+3. Manager role support in UI (schema supports it via `fence_managers`, no screens yet — a manager would see the same landlord dashboard scoped to assigned fences only)
 4. Receipt detail view / shareable receipt rendering
 5. Deploy to Netlify, connect a domain
-6. WhatsApp click-to-chat phone verification — floated as a zero-per-message-cost alternative to SMS OTP, but it needs something always-on watching the business WhatsApp number for inbound messages (either Meta's paid Cloud API, or an unofficial device-automation gateway that's fragile and brushes against WhatsApp's terms). Not zero cost to build or run, just zero per message. Parked as a phase-2 idea, not blocking anything right now since magic link already solved the actual blocker for free.
+6. WhatsApp click-to-chat phone verification — floated as a zero-per-message alternative to SMS OTP, needs something always-on watching the business WhatsApp number (Meta's paid Cloud API, or a fragile unofficial gateway that brushes against WhatsApp's terms). Parked, not blocking anything since magic link already solved the real blocker for free.
 
 ## Decisions made
 - Airbnb-style UI/UX and flow for the tenant app, confirmed over uxpeak.com reference (shelved for now)
-- Full connected build, not a stripped MVP — built in layers (data model → auth → core screens → full feature set), same as any real app gets built
+- Full connected build, not a stripped MVP — built in layers (data model → auth → core screens → full feature set)
 - Auth: email magic link over phone/SMS OTP, specifically to avoid a Twilio dependency and keep cost at $0
-- Admin/landlord side: responsive single-page layout — desktop gets a dense table + sidebar nav (built for working at a desk), mobile gets stacked cards + bottom tab bar. Tenant side stays mobile-first/mobile-only in spirit (Airbnb-style), not responsive-desktop
-- Brand colors/fonts carry over from the campaign graphics: `#1F5BFF` / `#143ea8` blue, system font stack
+- Admin/landlord side is responsive (desktop table + sidebar / mobile cards + bottom tabs); tenant side is mobile-only by design, no desktop variant planned
+- Brand colors/fonts carry over from the campaign graphics: `#1F5BFF` / `#143ea8` blue, system font stack — kept deliberately instead of defaulting to Airbnb's own coral, since tenants will have already seen this blue in outreach materials
 
 ## Working agreement
 - Push after every meaningful chunk, update this file in the same commit

@@ -2,19 +2,27 @@ import { useEffect, useState } from 'react'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../lib/AuthContext'
 
+type MonthStatus = 'confirmed' | 'pending' | 'none'
+
 interface TenantRow {
   tenancyId: string
   unitLabel: string
   fenceName: string
   tenantName: string
   monthlyRent: number
-  lastPaymentStatus: 'confirmed' | 'pending' | 'none'
+  status: MonthStatus
+  pendingPaymentId: string | null
+}
+
+function currentMonthKey() {
+  return new Date().toISOString().slice(0, 7) // YYYY-MM
 }
 
 export default function LandlordDashboard() {
   const { profile } = useAuth()
   const [rows, setRows] = useState<TenantRow[]>([])
   const [loading, setLoading] = useState(true)
+  const [busyId, setBusyId] = useState<string | null>(null)
 
   useEffect(() => {
     if (!profile) return
@@ -29,63 +37,84 @@ export default function LandlordDashboard() {
         `id, status,
          unit:units ( label, monthly_rent, fence:fences ( name ) ),
          tenant:profiles!tenancies_tenant_id_fkey ( full_name, phone ),
-         payments ( status, period_month, created_at )`
+         payments ( id, status, period_month )`
       )
       .eq('status', 'active')
 
+    const thisMonth = currentMonthKey()
+
     const mapped: TenantRow[] = (tenancies ?? []).map((t: any) => {
-      const latestPayment = (t.payments ?? []).sort(
-        (a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-      )[0]
+      const payments: any[] = t.payments ?? []
+      const thisMonthPayments = payments.filter((p) => p.period_month.slice(0, 7) === thisMonth)
+      const confirmed = thisMonthPayments.find((p) => p.status === 'confirmed')
+      const pending = thisMonthPayments.find((p) => p.status === 'pending')
+
       return {
         tenancyId: t.id,
         unitLabel: t.unit?.label ?? '—',
         fenceName: t.unit?.fence?.name ?? '—',
         tenantName: t.tenant?.full_name ?? t.tenant?.phone ?? 'Unnamed tenant',
         monthlyRent: t.unit?.monthly_rent ?? 0,
-        lastPaymentStatus: latestPayment?.status ?? 'none',
+        status: confirmed ? 'confirmed' : pending ? 'pending' : 'none',
+        pendingPaymentId: pending?.id ?? null,
       }
     })
     setRows(mapped)
     setLoading(false)
   }
 
-  async function markPaid(tenancyId: string, amount: number) {
-    const period = new Date().toISOString().slice(0, 10)
-    const { data: payment, error } = await supabase
-      .from('payments')
-      .insert({
-        tenancy_id: tenancyId,
-        amount,
-        method: 'mobile_money',
-        period_month: period,
-        status: 'confirmed',
-        confirmed_by: profile?.id,
-        confirmed_at: new Date().toISOString(),
-      })
-      .select()
-      .single()
+  async function confirmPayment(row: TenantRow) {
+    setBusyId(row.tenancyId)
 
-    if (error || !payment) {
-      console.error(error)
-      return
+    let paymentId = row.pendingPaymentId
+
+    if (paymentId) {
+      await supabase
+        .from('payments')
+        .update({ status: 'confirmed', confirmed_by: profile?.id, confirmed_at: new Date().toISOString() })
+        .eq('id', paymentId)
+    } else {
+      const { data: payment, error } = await supabase
+        .from('payments')
+        .insert({
+          tenancy_id: row.tenancyId,
+          amount: row.monthlyRent,
+          method: 'mobile_money',
+          period_month: new Date().toISOString().slice(0, 10),
+          status: 'confirmed',
+          confirmed_by: profile?.id,
+          confirmed_at: new Date().toISOString(),
+        })
+        .select()
+        .single()
+      if (error || !payment) {
+        console.error(error)
+        setBusyId(null)
+        return
+      }
+      paymentId = payment.id
     }
 
     const receiptNumber = `ENJ-${Date.now().toString(36).toUpperCase()}`
-    await supabase.from('receipts').insert({
-      payment_id: payment.id,
-      receipt_number: receiptNumber,
-    })
+    await supabase.from('receipts').insert({ payment_id: paymentId, receipt_number: receiptNumber })
 
     await loadTenants()
+    setBusyId(null)
   }
 
-  const paidBadge = (status: TenantRow['lastPaymentStatus']) =>
-    status === 'confirmed' ? (
-      <span className="rounded-full bg-green-100 px-3 py-1 text-xs font-semibold text-green-700">Paid</span>
-    ) : (
-      <span className="rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-700">Not paid</span>
-    )
+  const statusBadge = (status: MonthStatus) => {
+    if (status === 'confirmed')
+      return <span className="rounded-full bg-green-100 px-3 py-1 text-xs font-semibold text-green-700">Paid</span>
+    if (status === 'pending')
+      return (
+        <span className="rounded-full bg-blue-100 px-3 py-1 text-xs font-semibold text-blue-700">
+          Awaiting confirm
+        </span>
+      )
+    return <span className="rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-700">Not paid</span>
+  }
+
+  const actionLabel = (status: MonthStatus) => (status === 'pending' ? 'Confirm' : 'Mark paid')
 
   return (
     <div className="min-h-full bg-paper p-4 md:p-10">
@@ -122,14 +151,15 @@ export default function LandlordDashboard() {
                     <td className="px-5 py-4 text-ink/70">{row.unitLabel}</td>
                     <td className="px-5 py-4 text-ink/70">{row.fenceName}</td>
                     <td className="px-5 py-4 text-ink/70">UGX {row.monthlyRent.toLocaleString()}</td>
-                    <td className="px-5 py-4">{paidBadge(row.lastPaymentStatus)}</td>
+                    <td className="px-5 py-4">{statusBadge(row.status)}</td>
                     <td className="px-5 py-4 text-right">
-                      {row.lastPaymentStatus !== 'confirmed' && (
+                      {row.status !== 'confirmed' && (
                         <button
-                          onClick={() => markPaid(row.tenancyId, row.monthlyRent)}
-                          className="rounded-lg bg-brand px-4 py-2 text-xs font-bold text-white hover:bg-brand-deep"
+                          onClick={() => confirmPayment(row)}
+                          disabled={busyId === row.tenancyId}
+                          className="rounded-lg bg-brand px-4 py-2 text-xs font-bold text-white hover:bg-brand-deep disabled:opacity-50"
                         >
-                          Mark paid
+                          {busyId === row.tenancyId ? '…' : actionLabel(row.status)}
                         </button>
                       )}
                     </td>
@@ -150,18 +180,19 @@ export default function LandlordDashboard() {
                       {row.unitLabel} · {row.fenceName}
                     </p>
                   </div>
-                  {paidBadge(row.lastPaymentStatus)}
+                  {statusBadge(row.status)}
                 </div>
                 <div className="mt-3 flex items-center justify-between">
                   <span className="text-sm font-semibold text-ink/70">
                     UGX {row.monthlyRent.toLocaleString()}
                   </span>
-                  {row.lastPaymentStatus !== 'confirmed' && (
+                  {row.status !== 'confirmed' && (
                     <button
-                      onClick={() => markPaid(row.tenancyId, row.monthlyRent)}
-                      className="rounded-lg bg-brand px-4 py-2 text-xs font-bold text-white hover:bg-brand-deep"
+                      onClick={() => confirmPayment(row)}
+                      disabled={busyId === row.tenancyId}
+                      className="rounded-lg bg-brand px-4 py-2 text-xs font-bold text-white hover:bg-brand-deep disabled:opacity-50"
                     >
-                      Mark paid
+                      {busyId === row.tenancyId ? '…' : actionLabel(row.status)}
                     </button>
                   )}
                 </div>
