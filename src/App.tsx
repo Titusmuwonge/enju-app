@@ -11,6 +11,10 @@ import TenantLayout from './components/TenantLayout'
 import TenantHome from './pages/tenant/Home'
 import TenantCalendar from './pages/tenant/Calendar'
 import TenantDiscover from './pages/tenant/Discover'
+import AdminLayout from './components/AdminLayout'
+import AdminOverview from './pages/admin/Overview'
+import AdminBuildings from './pages/admin/Buildings'
+import AdminPayments from './pages/admin/Payments'
 
 function Gate({ children }: { children: React.ReactNode }) {
   const { session, profile, loading } = useAuth()
@@ -26,7 +30,15 @@ function Gate({ children }: { children: React.ReactNode }) {
 function RoleHome() {
   const { profile } = useAuth()
   if (profile?.role === 'tenant') return <Navigate to="/tenant" replace />
+  if (profile?.role === 'admin') return <Navigate to="/admin" replace />
   return <Navigate to="/landlord" replace />
+}
+
+/** Extra gate for admin-only routes: a non-admin who wanders to /admin gets bounced home. */
+function AdminGate({ children }: { children: React.ReactNode }) {
+  const { profile } = useAuth()
+  if (profile?.role !== 'admin') return <Navigate to="/" replace />
+  return <>{children}</>
 }
 
 function App() {
@@ -78,6 +90,21 @@ function App() {
             <Route index element={<TenantHome />} />
             <Route path="calendar" element={<TenantCalendar />} />
             <Route path="discover" element={<TenantDiscover />} />
+          </Route>
+
+          <Route
+            path="/admin"
+            element={
+              <Gate>
+                <AdminGate>
+                  <AdminLayout />
+                </AdminGate>
+              </Gate>
+            }
+          >
+            <Route index element={<AdminOverview />} />
+            <Route path="buildings" element={<AdminBuildings />} />
+            <Route path="payments" element={<AdminPayments />} />
           </Route>
 
           <Route

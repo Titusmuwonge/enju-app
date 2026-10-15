@@ -1,7 +1,9 @@
 // Hand-written types mirroring the Supabase schema (core_schema migration).
 // Row shapes only — regenerate with `supabase gen types` once the schema stabilizes.
 
-export type Role = 'landlord' | 'manager' | 'tenant'
+export type Role = 'landlord' | 'manager' | 'tenant' | 'admin'
+export type IntegrationProvider = 'mtn_momo' | 'airtel_money'
+export type IntegrationStatus = 'not_configured' | 'connected' | 'disabled'
 export type FenceStatus = 'active' | 'inactive'
 export type UnitStatus = 'occupied' | 'vacant'
 export type TenancyStatus = 'active' | 'ended'
@@ -59,6 +61,7 @@ export interface Payment {
   status: PaymentStatus
   confirmed_by: string | null
   confirmed_at: string | null
+  integration_id: string | null
   created_at: string
 }
 
@@ -67,4 +70,15 @@ export interface Receipt {
   payment_id: string
   receipt_number: string
   issued_at: string
+}
+
+export interface PaymentIntegration {
+  id: string
+  fence_id: string
+  provider: IntegrationProvider
+  status: IntegrationStatus
+  public_config: { merchant_name?: string; short_code?: string }
+  configured_by: string | null
+  created_at: string
+  updated_at: string
 }

@@ -16,6 +16,14 @@ interface TenantRow {
   evidencePath: string | null
 }
 
+interface ConnectedIntegration {
+  fenceName: string
+  providerLabel: string
+  merchantName: string
+}
+
+const PROVIDER_LABEL: Record<string, string> = { mtn_momo: 'MTN Mobile Money', airtel_money: 'Airtel Money' }
+
 function currentMonthKey() {
   return new Date().toISOString().slice(0, 7) // YYYY-MM
 }
@@ -23,13 +31,31 @@ function currentMonthKey() {
 export default function LandlordDashboard() {
   const { profile } = useAuth()
   const [rows, setRows] = useState<TenantRow[]>([])
+  const [connected, setConnected] = useState<ConnectedIntegration[]>([])
   const [loading, setLoading] = useState(true)
   const [busyId, setBusyId] = useState<string | null>(null)
 
   useEffect(() => {
     if (!profile) return
     void loadTenants()
+    void loadIntegrations()
   }, [profile?.id])
+
+  async function loadIntegrations() {
+    // RLS scopes this to fences this landlord/manager owns or manages — see
+    // "owner/manager read own fence integrations" policy.
+    const { data } = await supabase
+      .from('payment_integrations')
+      .select('provider, public_config, fence:fences ( name )')
+      .eq('status', 'connected')
+    setConnected(
+      (data ?? []).map((i: any) => ({
+        fenceName: i.fence?.name ?? 'Your building',
+        providerLabel: PROVIDER_LABEL[i.provider] ?? i.provider,
+        merchantName: i.public_config?.merchant_name ?? '',
+      }))
+    )
+  }
 
   async function loadTenants() {
     setLoading(true)
@@ -141,6 +167,18 @@ export default function LandlordDashboard() {
         <h1 className="text-xl font-extrabold text-ink md:text-2xl">Your buildings</h1>
         <p className="mt-1 text-sm text-ink/60">Every tenant, every payment, tracked automatically.</p>
       </header>
+
+      {connected.length > 0 && (
+        <div className="mb-5 flex flex-col gap-2">
+          {connected.map((c, i) => (
+            <div key={i} className="flex items-center gap-2 rounded-xl bg-green-50 px-4 py-2.5 text-sm text-green-800">
+              <span className="font-bold">●</span>
+              {c.fenceName}: {c.providerLabel} connected{c.merchantName ? ` via ${c.merchantName}` : ''} — mobile
+              money payments for this building are ready to route automatically once Enju's live.
+            </div>
+          ))}
+        </div>
+      )}
 
       {loading ? (
         <p className="text-ink/50">Loading tenants…</p>
