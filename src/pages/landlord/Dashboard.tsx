@@ -12,6 +12,8 @@ interface TenantRow {
   monthlyRent: number
   status: MonthStatus
   pendingPaymentId: string | null
+  confirmedPaymentId: string | null
+  evidencePath: string | null
 }
 
 function currentMonthKey() {
@@ -37,7 +39,7 @@ export default function LandlordDashboard() {
         `id, status,
          unit:units ( label, monthly_rent, fence:fences ( name ) ),
          tenant:profiles!tenancies_tenant_id_fkey ( full_name, phone ),
-         payments ( id, status, period_month )`
+         payments ( id, status, period_month, evidence_path )`
       )
       .eq('status', 'active')
 
@@ -57,10 +59,20 @@ export default function LandlordDashboard() {
         monthlyRent: t.unit?.monthly_rent ?? 0,
         status: confirmed ? 'confirmed' : pending ? 'pending' : 'none',
         pendingPaymentId: pending?.id ?? null,
+        confirmedPaymentId: confirmed?.id ?? null,
+        evidencePath: pending?.evidence_path ?? null,
       }
     })
     setRows(mapped)
     setLoading(false)
+  }
+
+  async function viewEvidence(path: string) {
+    const { data, error } = await supabase.storage
+      .from('payment-evidence')
+      .createSignedUrl(path, 60)
+    if (error || !data) return
+    window.open(data.signedUrl, '_blank')
   }
 
   async function confirmPayment(row: TenantRow) {
@@ -69,10 +81,17 @@ export default function LandlordDashboard() {
     let paymentId = row.pendingPaymentId
 
     if (paymentId) {
-      await supabase
-        .from('payments')
-        .update({ status: 'confirmed', confirmed_by: profile?.id, confirmed_at: new Date().toISOString() })
-        .eq('id', paymentId)
+      // Atomic, race-safe: only the first confirm wins (see confirm_payment_evidence_and_audit migration).
+      const { data: confirmed } = await supabase.rpc('confirm_payment', {
+        p_payment_id: paymentId,
+        p_confirmer: profile?.id,
+      })
+      if (!confirmed) {
+        // Someone else already confirmed it, or it moved on. Just refresh to the real state.
+        await loadTenants()
+        setBusyId(null)
+        return
+      }
     } else {
       const { data: payment, error } = await supabase
         .from('payments')
@@ -153,15 +172,33 @@ export default function LandlordDashboard() {
                     <td className="px-5 py-4 text-ink/70">UGX {row.monthlyRent.toLocaleString()}</td>
                     <td className="px-5 py-4">{statusBadge(row.status)}</td>
                     <td className="px-5 py-4 text-right">
-                      {row.status !== 'confirmed' && (
-                        <button
-                          onClick={() => confirmPayment(row)}
-                          disabled={busyId === row.tenancyId}
-                          className="rounded-lg bg-brand px-4 py-2 text-xs font-bold text-white hover:bg-brand-deep disabled:opacity-50"
-                        >
-                          {busyId === row.tenancyId ? '…' : actionLabel(row.status)}
-                        </button>
-                      )}
+                      <div className="flex items-center justify-end gap-2">
+                        {row.evidencePath && (
+                          <button
+                            onClick={() => viewEvidence(row.evidencePath!)}
+                            className="text-xs font-bold text-brand-deep hover:underline"
+                          >
+                            View proof
+                          </button>
+                        )}
+                        {row.status === 'confirmed' && row.confirmedPaymentId && (
+                          <a
+                            href={`/receipt/${row.confirmedPaymentId}`}
+                            className="text-xs font-bold text-brand-deep hover:underline"
+                          >
+                            View receipt
+                          </a>
+                        )}
+                        {row.status !== 'confirmed' && (
+                          <button
+                            onClick={() => confirmPayment(row)}
+                            disabled={busyId === row.tenancyId}
+                            className="rounded-lg bg-brand px-4 py-2 text-xs font-bold text-white hover:bg-brand-deep disabled:opacity-50"
+                          >
+                            {busyId === row.tenancyId ? '…' : actionLabel(row.status)}
+                          </button>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -186,15 +223,33 @@ export default function LandlordDashboard() {
                   <span className="text-sm font-semibold text-ink/70">
                     UGX {row.monthlyRent.toLocaleString()}
                   </span>
-                  {row.status !== 'confirmed' && (
-                    <button
-                      onClick={() => confirmPayment(row)}
-                      disabled={busyId === row.tenancyId}
-                      className="rounded-lg bg-brand px-4 py-2 text-xs font-bold text-white hover:bg-brand-deep disabled:opacity-50"
-                    >
-                      {busyId === row.tenancyId ? '…' : actionLabel(row.status)}
-                    </button>
-                  )}
+                  <div className="flex items-center gap-3">
+                    {row.evidencePath && (
+                      <button
+                        onClick={() => viewEvidence(row.evidencePath!)}
+                        className="text-xs font-bold text-brand-deep hover:underline"
+                      >
+                        View proof
+                      </button>
+                    )}
+                    {row.status === 'confirmed' && row.confirmedPaymentId && (
+                      <a
+                        href={`/receipt/${row.confirmedPaymentId}`}
+                        className="text-xs font-bold text-brand-deep hover:underline"
+                      >
+                        View receipt
+                      </a>
+                    )}
+                    {row.status !== 'confirmed' && (
+                      <button
+                        onClick={() => confirmPayment(row)}
+                        disabled={busyId === row.tenancyId}
+                        className="rounded-lg bg-brand px-4 py-2 text-xs font-bold text-white hover:bg-brand-deep disabled:opacity-50"
+                      >
+                        {busyId === row.tenancyId ? '…' : actionLabel(row.status)}
+                      </button>
+                    )}
+                  </div>
                 </div>
               </div>
             ))}

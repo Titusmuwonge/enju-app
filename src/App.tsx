@@ -3,6 +3,7 @@ import { AuthProvider, useAuth } from './lib/AuthContext'
 import Login from './pages/Login'
 import CompleteProfile from './pages/CompleteProfile'
 import JoinBuilding from './pages/JoinBuilding'
+import Receipt from './pages/Receipt'
 import LandlordLayout from './components/LandlordLayout'
 import LandlordDashboard from './pages/landlord/Dashboard'
 import Fences from './pages/landlord/Fences'
@@ -41,6 +42,15 @@ function App() {
             element={
               <Gate>
                 <JoinBuilding />
+              </Gate>
+            }
+          />
+
+          <Route
+            path="/receipt/:paymentId"
+            element={
+              <Gate>
+                <Receipt />
               </Gate>
             }
           />
