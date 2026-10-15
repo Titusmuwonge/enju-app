@@ -20,6 +20,13 @@ Read this file first, every session. It's the single source of truth for where t
 - **Receipt page** (`/receipt/:paymentId`, shared by both roles via RLS): an actual rendered, shareable receipt — not just a database row — with a share button (native share sheet on mobile, clipboard fallback)
 - Design approach: followed the `frontend-design` skill throughout — kept Enju's existing blue rather than defaulting to Airbnb's literal coral, one bold hero element per screen, no decorative eyebrows/numbered steps where the content isn't actually a sequence
 
+## Deploy status
+- **Netlify is a dead end from this Claude session**: the sandbox's network policy blocks every `netlify.com`/`netlify.app` host outright (confirmed via proxy status, not a transient error) — the `deploy-site` MCP tool only ever returns a CLI command, and that CLI can't reach Netlify's servers from here. Don't keep retrying this path from inside the session.
+- **Switched to GitHub Pages instead**, since `github.com` is already reachable: built the production bundle (`vite build` with `base: '/enju-app/'` in `vite.config.ts`, and `basename={import.meta.env.BASE_URL}` on `BrowserRouter` in `App.tsx` so routing works from the `/enju-app/` subpath), pushed it to a `gh-pages` branch (orphan branch, just the built `dist/` contents plus a `404.html` copy of `index.html` for SPA deep-link fallback and `.nojekyll`).
+- GitHub's Pages-settings API is also blocked from this session (403 through the proxy, both read and write) — enabling Pages itself needs ONE manual click from Titus: github.com/Titusmuwonge/enju-app/settings/pages → Source: "Deploy from a branch" → Branch: `gh-pages`, folder `/` → Save. After that it's live at `https://titusmuwonge.github.io/enju-app/` within ~1 minute, and every future push to `gh-pages` auto-updates it (no further clicks needed).
+- To redeploy after new changes: `npm run build`, copy `dist/` contents into a fresh `gh-pages` branch, push. (Should be scripted into a one-liner once this becomes routine — not done yet.)
+- Netlify site `enju-app` (ID `1ed13227-f508-4eed-98f2-e94ecbba69d5`) still exists with env vars set, in case Titus wants to link it to the GitHub repo himself via the Netlify dashboard later (Netlify's "New site from Git" flow auto-deploys on every push and doesn't need any API access from this session at all) — that's actually the more robust long-term option since it includes the SPA redirect rule already in `netlify.toml`, GH Pages does not.
+
 ## Not done yet (in order)
 1. Tenant Calendar: real payment history view (data's there, just needs a screen)
 2. Tenant Discover: cross-building vacancy marketplace (needs more than one live building to mean anything)
