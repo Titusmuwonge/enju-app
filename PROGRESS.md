@@ -45,6 +45,21 @@ of these from inside the session.
 - To redeploy after new changes: `npm run build`, copy `dist/` contents into a fresh `gh-pages` branch, push. (Should be scripted into a one-liner once this becomes routine — not done yet.)
 - Netlify site `enju-app` (ID `1ed13227-f508-4eed-98f2-e94ecbba69d5`) still exists with env vars set, in case Titus wants to link it to the GitHub repo himself via the Netlify dashboard later (Netlify's "New site from Git" flow auto-deploys on every push and doesn't need any API access from this session at all) — that's actually the more robust long-term option since it includes the SPA redirect rule already in `netlify.toml`, GH Pages does not.
 
+## Deploy status — confirmed live
+GitHub Pages settings page confirmed: "Your site is live at https://titusmuwonge.github.io/enju-app/", source = `gh-pages` branch / root. An earlier 404 was just propagation lag right after first enabling it — resolved on its own.
+
+## Known gap: Supabase's default mailer rate-limits fast (deferred on purpose)
+Supabase's built-in email sender (used for magic links until custom SMTP is configured) allows only
+a handful of sends per hour — it's meant for development, not real users. Titus hit it while
+retesting the redirect-URL fix. **Decision: leave this as-is for now** (not worth setting up SMTP
+yet while still solo-testing) — but this is a real pre-launch blocker, not just an annoyance: with
+real tenants requesting magic links to pay rent, this limit will lock people out constantly.
+**Before onboarding any real landlord/tenant**, set up custom SMTP in Supabase (Project Settings →
+Authentication → SMTP Settings) — fastest option is Gmail SMTP with an App Password using
+titusmuwonge@gmail.com (5 min, no new signup, ~500/day cap, plenty for early users); cleaner
+long-term option is Resend with a verified branded domain (e.g. `amanawebug.com`) for a
+professional `no-reply@` sender. Revisit this before real-user launch, not during casual testing.
+
 ## Payment-API-readiness & admin dashboard (new this round)
 - `profiles.role` now allows `'admin'` — a 4th role, separate from landlord/manager/tenant, not selectable in the self-signup CompleteProfile screen (only landlord/manager/tenant are). **Titus's own profile is not yet flagged admin** — once he signs in once with titusmuwonge@gmail.com and completes profile (pick anything, it doesn't matter), run: `update profiles set role='admin' where email='titusmuwonge@gmail.com';` to flip it. Do this next session if he hasn't asked for it by then.
 - `is_admin()` security-definer SQL function + read-only admin policies on every table (fences/units/tenancies/payments/receipts/profiles/fence_managers/audit_log) — Titus can see everything platform-wide, but can't edit a landlord's tenants/units directly (that stays the landlord's).
