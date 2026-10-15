@@ -20,6 +20,24 @@ Read this file first, every session. It's the single source of truth for where t
 - **Receipt page** (`/receipt/:paymentId`, shared by both roles via RLS): an actual rendered, shareable receipt — not just a database row — with a share button (native share sheet on mobile, clipboard fallback)
 - Design approach: followed the `frontend-design` skill throughout — kept Enju's existing blue rather than defaulting to Airbnb's literal coral, one bold hero element per screen, no decorative eyebrows/numbered steps where the content isn't actually a sequence
 
+## Known pattern: this sandbox's network allowlist blocks management APIs
+Netlify's API/CLI, GitHub's Pages-settings API, and now the Supabase Management API have all
+turned out to be unreachable from inside this Claude session (confirmed via direct connect
+attempts, each refused by the proxy — not transient, don't bother retrying). The project's own
+*data* APIs (Supabase Postgres/Storage/Auth via the Supabase MCP tools, git push to GitHub) work
+fine — it's specifically each platform's *account/dashboard-settings* API that's walled off. So:
+anything that's "flip a setting in the provider's dashboard" (enable Pages, set Auth redirect
+URLs, link a Git repo to Netlify, etc.) needs Titus to click it once himself; anything that's
+"change the app or its data" I can do directly. Check this list before spending time retrying one
+of these from inside the session.
+
+- **Supabase Auth redirect URLs still point at `localhost:3000`** (the project default) — magic
+  links will 404/unreachable until Titus sets this once: Supabase dashboard →
+  supabase.com/dashboard/project/mbechxwgkvwriuainefl/auth/url-configuration → Site URL =
+  `https://titusmuwonge.github.io/enju-app/`, add `https://titusmuwonge.github.io/enju-app/**` to
+  Redirect URLs, save. One-time; not needed again unless the domain changes (e.g. moving to
+  Netlify or a custom domain later).
+
 ## Deploy status
 - **Netlify is a dead end from this Claude session**: the sandbox's network policy blocks every `netlify.com`/`netlify.app` host outright (confirmed via proxy status, not a transient error) — the `deploy-site` MCP tool only ever returns a CLI command, and that CLI can't reach Netlify's servers from here. Don't keep retrying this path from inside the session.
 - **Switched to GitHub Pages instead**, since `github.com` is already reachable: built the production bundle (`vite build` with `base: '/enju-app/'` in `vite.config.ts`, and `basename={import.meta.env.BASE_URL}` on `BrowserRouter` in `App.tsx` so routing works from the `/enju-app/` subpath), pushed it to a `gh-pages` branch (orphan branch, just the built `dist/` contents plus a `404.html` copy of `index.html` for SPA deep-link fallback and `.nojekyll`).
