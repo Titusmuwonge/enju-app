@@ -45,6 +45,15 @@ of these from inside the session.
 - To redeploy after new changes: `npm run build`, copy `dist/` contents into a fresh `gh-pages` branch, push. (Should be scripted into a one-liner once this becomes routine — not done yet.)
 - Netlify site `enju-app` (ID `1ed13227-f508-4eed-98f2-e94ecbba69d5`) still exists with env vars set, in case Titus wants to link it to the GitHub repo himself via the Netlify dashboard later (Netlify's "New site from Git" flow auto-deploys on every push and doesn't need any API access from this session at all) — that's actually the more robust long-term option since it includes the SPA redirect rule already in `netlify.toml`, GH Pages does not.
 
+## Fixed: more of the same subpath bug, in navigation this time
+After the login fix, the post-profile redirect (`CompleteProfile.tsx`: `window.location.href = '/'`)
+and the "View receipt"/"Join a building" links (`<a href="/receipt/...">`, plain anchor tags
+instead of react-router `Link`) hit the identical GitHub-Pages-subpath 404. Swept the whole `src/`
+tree for every hardcoded absolute path: the two `window.location.href` redirects now use
+`import.meta.env.BASE_URL`, and every `<a href="/...">` became a `<Link to="/...">`, which goes
+through react-router's `basename` (set on `BrowserRouter` already) and is correct automatically —
+no more manual path-gluing needed for those. Checked there's nothing left (`grep -rn '<a \|window.location.href =' src/` is clean now).
+
 ## Fixed: magic link 404 was a code bug, not a dashboard setting
 `Login.tsx` passed `emailRedirectTo: window.location.origin`, which is just the domain
 (`https://titusmuwonge.github.io`) — it drops the `/enju-app/` GitHub Pages subpath entirely, so
