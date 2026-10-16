@@ -26,8 +26,9 @@ export default function CompleteProfile() {
       return
     }
     // Profile is picked up by AuthContext's listener on next render;
-    // force a reload so the whole tree re-fetches cleanly.
-    window.location.href = '/'
+    // force a reload so the whole tree re-fetches cleanly. BASE_URL (not a bare '/') keeps
+    // this correct under a subpath host like GitHub Pages — see Login.tsx for the same fix.
+    window.location.href = import.meta.env.BASE_URL
   }
 
   return (

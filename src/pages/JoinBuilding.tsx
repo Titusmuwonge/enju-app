@@ -52,7 +52,8 @@ export default function JoinBuilding() {
 
     await supabase.from('units').update({ status: 'occupied' }).eq('id', vacantUnit.id)
 
-    window.location.href = '/tenant'
+    // BASE_URL keeps this correct under a subpath host like GitHub Pages.
+    window.location.href = `${import.meta.env.BASE_URL}tenant`
   }
 
   return (

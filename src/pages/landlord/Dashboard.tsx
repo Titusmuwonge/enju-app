@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../lib/AuthContext'
 
@@ -220,12 +221,12 @@ export default function LandlordDashboard() {
                           </button>
                         )}
                         {row.status === 'confirmed' && row.confirmedPaymentId && (
-                          <a
-                            href={`/receipt/${row.confirmedPaymentId}`}
+                          <Link
+                            to={`/receipt/${row.confirmedPaymentId}`}
                             className="text-xs font-bold text-brand-deep hover:underline"
                           >
                             View receipt
-                          </a>
+                          </Link>
                         )}
                         {row.status !== 'confirmed' && (
                           <button
@@ -271,12 +272,12 @@ export default function LandlordDashboard() {
                       </button>
                     )}
                     {row.status === 'confirmed' && row.confirmedPaymentId && (
-                      <a
-                        href={`/receipt/${row.confirmedPaymentId}`}
+                      <Link
+                        to={`/receipt/${row.confirmedPaymentId}`}
                         className="text-xs font-bold text-brand-deep hover:underline"
                       >
                         View receipt
-                      </a>
+                      </Link>
                     )}
                     {row.status !== 'confirmed' && (
                       <button

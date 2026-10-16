@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../lib/AuthContext'
 
@@ -119,9 +120,9 @@ export default function TenantHome() {
     return (
       <div className="flex min-h-[70vh] flex-col items-center justify-center gap-3 px-6 text-center">
         <p className="text-sm text-ink/50">You're not linked to a building yet.</p>
-        <a href="/join-building" className="text-sm font-bold text-brand-deep hover:underline">
+        <Link to="/join-building" className="text-sm font-bold text-brand-deep hover:underline">
           Join a building
-        </a>
+        </Link>
       </div>
     )
   }
@@ -147,12 +148,12 @@ export default function TenantHome() {
             <p className="mt-1 text-3xl font-extrabold">You're all set</p>
             <p className="mt-2 text-sm text-white/80">Rent for this month is confirmed paid.</p>
             {info.confirmedPaymentId && (
-              <a
-                href={`/receipt/${info.confirmedPaymentId}`}
+              <Link
+                to={`/receipt/${info.confirmedPaymentId}`}
                 className="mt-4 inline-block rounded-xl bg-white px-5 py-3 text-sm font-bold text-emerald-700"
               >
                 View receipt
-              </a>
+              </Link>
             )}
           </>
         ) : info.pendingThisMonth ? (
