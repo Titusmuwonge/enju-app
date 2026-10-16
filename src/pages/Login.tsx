@@ -10,9 +10,12 @@ export default function Login() {
   async function sendMagicLink() {
     setLoading(true)
     setError(null)
+    // window.location.origin alone drops the GitHub Pages subpath (/enju-app/) and sends the
+    // magic link to the bare domain, which 404s. BASE_URL carries that subpath (it's '/' on a
+    // custom domain or Netlify, so this stays correct if we move hosts later).
     const { error } = await supabase.auth.signInWithOtp({
       email,
-      options: { emailRedirectTo: window.location.origin },
+      options: { emailRedirectTo: window.location.origin + import.meta.env.BASE_URL },
     })
     setLoading(false)
     if (error) {
