@@ -45,6 +45,14 @@ of these from inside the session.
 - To redeploy after new changes: `npm run build`, copy `dist/` contents into a fresh `gh-pages` branch, push. (Should be scripted into a one-liner once this becomes routine — not done yet.)
 - Netlify site `enju-app` (ID `1ed13227-f508-4eed-98f2-e94ecbba69d5`) still exists with env vars set, in case Titus wants to link it to the GitHub repo himself via the Netlify dashboard later (Netlify's "New site from Git" flow auto-deploys on every push and doesn't need any API access from this session at all) — that's actually the more robust long-term option since it includes the SPA redirect rule already in `netlify.toml`, GH Pages does not.
 
+## Fixed: magic link 404 was a code bug, not a dashboard setting
+`Login.tsx` passed `emailRedirectTo: window.location.origin`, which is just the domain
+(`https://titusmuwonge.github.io`) — it drops the `/enju-app/` GitHub Pages subpath entirely, so
+Supabase redirected the magic link to a URL that genuinely doesn't exist (404 was correct, not a
+propagation glitch). Fixed to `window.location.origin + import.meta.env.BASE_URL`, rebuilt,
+redeployed. Stays correct automatically if we ever move to a custom domain or Netlify (`BASE_URL`
+becomes `/` there).
+
 ## Deploy status — confirmed live
 GitHub Pages settings page confirmed: "Your site is live at https://titusmuwonge.github.io/enju-app/", source = `gh-pages` branch / root. An earlier 404 was just propagation lag right after first enabling it — resolved on its own.
 
